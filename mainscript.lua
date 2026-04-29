@@ -56,7 +56,7 @@ end
 
 -- ==================== FAST ATTACK ====================
 local FastAttackEnabled = false
-local FastAttackRange = 5000
+local FastAttackRange = 7500
 local FastAttackConnection = nil
 
 local Net = ReplicatedStorage:WaitForChild("Modules", 5) and
