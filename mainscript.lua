@@ -56,7 +56,7 @@ end
 
 -- ==================== FAST ATTACK ====================
 local FastAttackEnabled = false
-local FastAttackRange = 7500
+local FastAttackRange = 5000
 local FastAttackConnection = nil
 
 local Net = ReplicatedStorage:WaitForChild("Modules", 5) and
@@ -236,10 +236,11 @@ local function createPage(name)
     return p
 end
 
-local combatPage = createPage("Combate")
-local movePage   = createPage("Movimiento")
-local sea2Page   = createPage("Sea2")
-local sea3Page   = createPage("Sea3")
+local combatPage  = createPage("Combate")
+local movePage    = createPage("Movimiento")
+local sea2Page    = createPage("Sea2")
+local sea3Page    = createPage("Sea3")
+local visualsPage = createPage("Visuals")
 
 local function showPage(page)
     for _, v in pairs(contentFrame:GetChildren()) do
@@ -269,6 +270,7 @@ createTab("⚔️ Combate", combatPage)
 createTab("🏃 Mov",     movePage)
 createTab("🌊 Sea 2",   sea2Page)
 createTab("🏰 Sea 3",   sea3Page)
+createTab("🖥️ Visuals", visualsPage)
 
 showPage(combatPage)
 
@@ -470,6 +472,68 @@ addBtn("🏰 Castillo", Color3.fromRGB(150, 100, 255), sea3Page).MouseButton1Cli
 end)
 addBtn("🏛️ Mansión", Color3.fromRGB(255, 170, 0), sea3Page).MouseButton1Click:Connect(function()
     Players.LocalPlayer.Character:PivotTo(CFrame.new(-12463, 375, -7523))
+end)
+
+-- ===== VISUALS =====
+local boostFpsEnabled = false
+local boostBtn = addBtn("🚀 Boost FPS: OFF", Color3.fromRGB(0, 220, 120), visualsPage)
+boostBtn.MouseButton1Click:Connect(function()
+    boostFpsEnabled = not boostFpsEnabled
+    boostBtn.Text = boostFpsEnabled and "🚀 Boost FPS: ON" or "🚀 Boost FPS: OFF"
+
+    if boostFpsEnabled then
+        -- Desactivar efectos visuales pesados
+        local lighting = game:GetService("Lighting")
+        lighting.GlobalShadows    = false
+        lighting.FogEnd           = 100000
+        lighting.Brightness       = 2
+
+        -- Eliminar efectos de post-procesado
+        for _, fx in pairs(lighting:GetChildren()) do
+            if fx:IsA("BlurEffect") or fx:IsA("BloomEffect")
+            or fx:IsA("ColorCorrectionEffect") or fx:IsA("SunRaysEffect")
+            or fx:IsA("DepthOfFieldEffect") then
+                fx.Enabled = false
+            end
+        end
+
+        -- Reducir calidad de partículas en el workspace
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") then
+                v.Enabled = false
+            elseif v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") then
+                v.Enabled = false
+            end
+        end
+
+        -- Limitar FPS target y reducir carga de render
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+
+        print("✅ Boost FPS activado — efectos visuales reducidos")
+    else
+        -- Restaurar configuraciones
+        local lighting = game:GetService("Lighting")
+        lighting.GlobalShadows = true
+
+        for _, fx in pairs(lighting:GetChildren()) do
+            if fx:IsA("BlurEffect") or fx:IsA("BloomEffect")
+            or fx:IsA("ColorCorrectionEffect") or fx:IsA("SunRaysEffect")
+            or fx:IsA("DepthOfFieldEffect") then
+                fx.Enabled = true
+            end
+        end
+
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") or v:IsA("Fire")
+            or v:IsA("Smoke") or v:IsA("Sparkles") then
+                v.Enabled = true
+            end
+        end
+
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+
+        print("🔄 Boost FPS desactivado — efectos restaurados")
+    end
 end)
 
 -- ===== CONTROLES VENTANA =====
