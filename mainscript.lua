@@ -417,23 +417,99 @@ local sBtn = addBtn("🚀 Speed Controller: OFF", Color3.fromRGB(0, 200, 200), m
 -- [NOTA: Aquí se incluye todo el código original de Sea 2, Sea 3 y Visuals que me pasaste]
 -- Debido al límite de espacio, asegúrate de que estas funciones (Jump, NoClip, Water, TPs) sigan debajo:
 
-local jBtn = addBtn("⬆️ Infinite Jump: OFF", Color3.fromRGB(100, 200, 255), movePage)
-local iJ = false
-jBtn.MouseButton1Click:Connect(function() iJ = not iJ jBtn.Text = iJ and "⬆️ Infinite Jump: ON" or "⬆️ Infinite Jump: OFF" end)
-UserInputService.JumpRequest:Connect(function() if iJ then local hum = LocalPlayer.Character:FindFirstChild("Humanoid") if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end end end)
+-- ===== TELEPORTS SEA 2 =====
+addBtn("🗺️ Barco Maldito", Color3.fromRGB(0, 200, 150), sea2Page).MouseButton1Click:Connect(function()
+    Players.LocalPlayer.Character:PivotTo(CFrame.new(923, 126, 32852))
+end)
 
-local nBtn = addBtn("🔥 No Clip: OFF", Color3.fromRGB(200, 100, 255), movePage)
-local ncl = false
-nBtn.MouseButton1Click:Connect(function() ncl = not ncl nBtn.Text = ncl and "🔥 No Clip: ON" or "🔥 No Clip: OFF" end)
-RunService.Stepped:Connect(function() if ncl and LocalPlayer.Character then for _, v in pairs(LocalPlayer.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end end end)
+-- ===== TELEPORTS SEA 3 =====
+addBtn("🏰 Castillo", Color3.fromRGB(150, 100, 255), sea3Page).MouseButton1Click:Connect(function()
+    Players.LocalPlayer.Character:PivotTo(CFrame.new(-5085, 316, -3156))
+end)
+addBtn("🏛️ Mansión", Color3.fromRGB(255, 170, 0), sea3Page).MouseButton1Click:Connect(function()
+    Players.LocalPlayer.Character:PivotTo(CFrame.new(-12463, 375, -7523))
+end)
 
--- TELEPORTS Y VISUALS (Originales)
-addBtn("🗺️ Barco Maldito", Color3.fromRGB(0, 200, 150), sea2Page).MouseButton1Click:Connect(function() LocalPlayer.Character:PivotTo(CFrame.new(923, 126, 32852)) end)
-addBtn("🏰 Castillo", Color3.fromRGB(150, 100, 255), sea3Page).MouseButton1Click:Connect(function() LocalPlayer.Character:PivotTo(CFrame.new(-5085, 316, -3156)) end)
+-- ===== VISUALS =====
+local boostFpsEnabled = false
+local boostBtn = addBtn("🚀 Boost FPS: OFF", Color3.fromRGB(0, 220, 120), visualsPage)
+boostBtn.MouseButton1Click:Connect(function()
+    boostFpsEnabled = not boostFpsEnabled
+    boostBtn.Text = boostFpsEnabled and "🚀 Boost FPS: ON" or "🚀 Boost FPS: OFF"
 
--- CONTROLES VENTANA FINAL
-closeBtn.MouseButton1Click:Connect(function() nowe = false tpwalking = false screenGui:Destroy() end)
-minimizeBtn.MouseButton1Click:Connect(function() contentFrame.Visible = false tabContainer.Visible = false mainFrame:TweenSize(minimizedSize, "Out", "Quint", 0.3, true) end)
-maximizeBtn.MouseButton1Click:Connect(function() mainFrame:TweenSize(normalSize, "Out", "Quint", 0.3, true) task.wait(0.2) contentFrame.Visible = true tabContainer.Visible = true end)
+    if boostFpsEnabled then
+        -- Desactivar efectos visuales pesados
+        local lighting = game:GetService("Lighting")
+        lighting.GlobalShadows    = false
+        lighting.FogEnd           = 100000
+        lighting.Brightness       = 2
 
-print("✅ Divine Hub Premium Cargado con Fly Original")
+        -- Eliminar efectos de post-procesado
+        for _, fx in pairs(lighting:GetChildren()) do
+            if fx:IsA("BlurEffect") or fx:IsA("BloomEffect")
+            or fx:IsA("ColorCorrectionEffect") or fx:IsA("SunRaysEffect")
+            or fx:IsA("DepthOfFieldEffect") then
+                fx.Enabled = false
+            end
+        end
+
+        -- Reducir calidad de partículas en el workspace
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") then
+                v.Enabled = false
+            elseif v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") then
+                v.Enabled = false
+            end
+        end
+
+        -- Limitar FPS target y reducir carga de render
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+
+        print("✅ Boost FPS activado — efectos visuales reducidos")
+    else
+        -- Restaurar configuraciones
+        local lighting = game:GetService("Lighting")
+        lighting.GlobalShadows = true
+
+        for _, fx in pairs(lighting:GetChildren()) do
+            if fx:IsA("BlurEffect") or fx:IsA("BloomEffect")
+            or fx:IsA("ColorCorrectionEffect") or fx:IsA("SunRaysEffect")
+            or fx:IsA("DepthOfFieldEffect") then
+                fx.Enabled = true
+            end
+        end
+
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") or v:IsA("Fire")
+            or v:IsA("Smoke") or v:IsA("Sparkles") then
+                v.Enabled = true
+            end
+        end
+
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+
+        print("🔄 Boost FPS desactivado — efectos restaurados")
+    end
+end)
+
+-- ===== CONTROLES VENTANA =====
+closeBtn.MouseButton1Click:Connect(function()
+    ESPEnabled = false
+    ClearESP()
+    local w = workspace:FindFirstChild("DivineWaterSolid")
+    if w then w:Destroy() end
+    screenGui:Destroy()
+end)
+minimizeBtn.MouseButton1Click:Connect(function()
+    contentFrame.Visible = false
+    tabContainer.Visible = false
+    mainFrame:TweenSize(minimizedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.3, true)
+end)
+maximizeBtn.MouseButton1Click:Connect(function()
+    mainFrame:TweenSize(normalSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.3, true)
+    task.wait(0.2)
+    contentFrame.Visible = true
+    tabContainer.Visible = true
+end)
+
+print("✅ Divine Hub Premium cargado correctamente")
