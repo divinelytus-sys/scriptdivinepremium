@@ -99,10 +99,22 @@ local FastAttackEnabled = false
 local FastAttackRange   = 5000
 local FAConn            = nil
 
-local Net = ReplicatedStorage:WaitForChild("Modules", 5) and
-            ReplicatedStorage.Modules:WaitForChild("Net", 5)
-local RegHit  = Net and pcall(function() return Net["RE/RegisterHit"] end)    and Net["RE/RegisterHit"]
-local RegAtk  = Net and pcall(function() return Net["RE/RegisterAttack"] end) and Net["RE/RegisterAttack"]
+-- BUG CORREGIDO #3: WaitForChild bloqueaba el hilo principal hasta 10s
+-- antes de que el GUI siquiera apareciera. Movido a task.spawn.
+local Net, RegHit, RegAtk = nil, nil, nil
+task.spawn(function()
+    local ok, modules = pcall(function()
+        return ReplicatedStorage:WaitForChild("Modules", 5)
+    end)
+    if not ok or not modules then return end
+    local ok2, net = pcall(function()
+        return modules:WaitForChild("Net", 5)
+    end)
+    if not ok2 or not net then return end
+    Net = net
+    pcall(function() RegHit = Net["RE/RegisterHit"] end)
+    pcall(function() RegAtk = Net["RE/RegisterAttack"] end)
+end)
 
 local function DoAttack(targets)
     if not RegHit or not RegAtk then return end
@@ -175,7 +187,9 @@ local win = Instance.new("Frame", SG)
 win.Name = "Win"; win.Size = FULL
 win.Position = UDim2.new(0.5,-W/2, 0.1, 0)
 win.BackgroundColor3 = BG_MAIN
-win.Active = true; win.Draggable = true
+-- BUG CORREGIDO #1: win.Active = true absorbía los clicks antes de que
+-- llegaran a btnClose y btnMin. Se elimina Active+Draggable del win
+-- y se implementa drag manual solo en la zona del header (sin los botones).
 win.BorderSizePixel = 0
 corner(win, 12)
 stroke(win, GOLD_DK, 1.5)
@@ -257,6 +271,8 @@ local content = Instance.new("Frame", win)
 content.Size = UDim2.new(1,-24,1,-110)
 content.Position = UDim2.new(0,12,0,108)
 content.BackgroundTransparency = 1
+-- BUG CORREGIDO (parte de #2): ClipsDescendants evita overflow visual
+content.ClipsDescendants = true
 
 -- ══════════════════════════════════════════
 -- PÁGINAS
@@ -267,7 +283,12 @@ local function mkPage(name)
     sf.Size = UDim2.new(1,0,1,0)
     sf.BackgroundTransparency = 1; sf.BorderSizePixel = 0
     sf.ScrollBarThickness = 3; sf.ScrollBarImageColor3 = GOLD_DK
-    sf.CanvasSize = UDim2.new(0,0,0,0)
+    -- BUG CORREGIDO #2: CanvasSize = UDim2(0,0,0,0) + AutomaticCanvasSize
+    -- NO funciona en muchos entornos/executors. El canvas se queda en 0px
+    -- de alto y CLIPEA todo el contenido → páginas aparecen vacías.
+    -- Solución: canvas fijo amplio como fallback; AutomaticCanvasSize
+    -- lo sobreescribe si funciona, si no, el contenido igual se ve.
+    sf.CanvasSize = UDim2.new(0,0,0,800)
     sf.AutomaticCanvasSize = Enum.AutomaticSize.Y
     sf.Visible = false
     local ul = Instance.new("UIListLayout", sf)
@@ -608,7 +629,10 @@ fpsBtn.MouseButton1Click:Connect(function()
                 if v:IsA("ParticleEmitter") or v:IsA("Fire")
                 or v:IsA("Smoke") or v:IsA("Sparkles") then v.Enabled = false end
             end
-            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            -- BUG CORREGIDO #4: settings() puede lanzar error en exploits
+            pcall(function()
+                settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            end)
         else
             L.GlobalShadows = true
             for _, fx in pairs(L:GetChildren()) do
@@ -620,7 +644,10 @@ fpsBtn.MouseButton1Click:Connect(function()
                 if v:IsA("ParticleEmitter") or v:IsA("Fire")
                 or v:IsA("Smoke") or v:IsA("Sparkles") then v.Enabled = true end
             end
-            settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+            -- BUG CORREGIDO #4 (restaurar calidad)
+            pcall(function()
+                settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+            end)
         end
     end)
 end)
@@ -629,6 +656,43 @@ end)
 -- CONTROLES VENTANA
 -- ══════════════════════════════════════════
 local minimized = false
+
+-- BUG CORREGIDO #1 (continuación): Drag manual en la zona izquierda del
+-- header para no interferir con los botones de la derecha.
+do
+    local dragging, dragStart, winStart = false, nil, nil
+    local dragZone = Instance.new("Frame", hdr)
+    dragZone.Size     = UDim2.new(1,-90,1,0)   -- cubre header excepto área de botones
+    dragZone.Position = UDim2.new(0,0,0,0)
+    dragZone.BackgroundTransparency = 1
+    dragZone.Active   = true                    -- solo esta zona absorbe el drag
+    dragZone.ZIndex   = 0                       -- detrás de botones
+    dragZone.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 or
+           inp.UserInputType == Enum.UserInputType.Touch then
+            dragging  = true
+            dragStart = inp.Position
+            winStart  = win.Position
+        end
+    end)
+    dragZone.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 or
+           inp.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(inp)
+        if not dragging then return end
+        if inp.UserInputType == Enum.UserInputType.MouseMovement or
+           inp.UserInputType == Enum.UserInputType.Touch then
+            local d = inp.Position - dragStart
+            win.Position = UDim2.new(
+                winStart.X.Scale, winStart.X.Offset + d.X,
+                winStart.Y.Scale, winStart.Y.Offset + d.Y
+            )
+        end
+    end)
+end
 
 btnMin.MouseButton1Click:Connect(function()
     minimized = not minimized
