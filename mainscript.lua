@@ -1,84 +1,40 @@
--- DIVINE HUB PREMIUM | Gold Edition
+-- DIVINE HUB PREMIUM | loadstring ready
 -- loadstring(game:HttpGet("URL_RAW_AQUI"))()
 
-local Players           = game:GetService("Players")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService  = game:GetService("UserInputService")
-local RunService        = game:GetService("RunService")
-local TweenService      = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
--- ══════════════════════════════════════════
--- PALETA DORADA
--- ══════════════════════════════════════════
-local GOLD       = Color3.fromRGB(212, 175,  55)
-local GOLD_LT    = Color3.fromRGB(255, 220, 100)
-local GOLD_DK    = Color3.fromRGB(140, 112,  30)
-local GOLD_FAINT = Color3.fromRGB(40,  34,  10)
-local BG_MAIN    = Color3.fromRGB(10,   9,  14)
-local BG_CARD    = Color3.fromRGB(20,  19,  26)
-local BG_HOVER   = Color3.fromRGB(30,  28,  38)
-local BG_NAV     = Color3.fromRGB(8,    7,  11)
-local WHITE      = Color3.fromRGB(240, 235, 215)
-local DIM        = Color3.fromRGB(110, 102,  76)
-local RED        = Color3.fromRGB(210,  55,  55)
-
--- ══════════════════════════════════════════
--- HELPERS
--- ══════════════════════════════════════════
-local TS = TweenService
-local function tween(obj, t, props)
-    TS:Create(obj, TweenInfo.new(t, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
-end
-
-local function corner(p, r)
-    local c = Instance.new("UICorner", p)
-    c.CornerRadius = UDim.new(0, r or 8)
-end
-
-local function stroke(p, col, th)
-    local s = Instance.new("UIStroke", p)
-    s.Color = col; s.Thickness = th or 1
-    return s
-end
-
-local function label(parent, txt, size, col, font, xa)
-    local l = Instance.new("TextLabel", parent)
-    l.BackgroundTransparency = 1
-    l.Text = txt
-    l.TextSize = size
-    l.TextColor3 = col or WHITE
-    l.Font = font or Enum.Font.GothamBold
-    l.TextXAlignment = xa or Enum.TextXAlignment.Left
-    l.TextYAlignment = Enum.TextYAlignment.Center
-    return l
-end
-
--- ══════════════════════════════════════════
--- ESP
--- ══════════════════════════════════════════
+-- ==================== ESP ====================
 local ESPEnabled = false
 local ESPObjects = {}
 
 local function CreateESP(target)
     if not target:FindFirstChild("Head") then return end
-    local bb = Instance.new("BillboardGui")
-    bb.Name = "DivineESP"; bb.Adornee = target.Head
-    bb.Size = UDim2.new(0,120,0,26); bb.StudsOffset = Vector3.new(0,3,0)
-    bb.AlwaysOnTop = true; bb.Parent = target.Head
-    local bg = Instance.new("Frame", bb)
-    bg.Size = UDim2.new(1,0,1,0)
-    bg.BackgroundColor3 = Color3.fromRGB(0,0,0)
-    bg.BackgroundTransparency = 0.45
-    corner(bg, 4); stroke(bg, GOLD_DK, 1)
-    local lbl = Instance.new("TextLabel", bg)
-    lbl.Size = UDim2.new(1,0,1,0); lbl.BackgroundTransparency = 1
-    lbl.Text = "✦ "..target.Name; lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 11; lbl.TextColor3 = GOLD_LT; lbl.TextStrokeTransparency = 0.5
-    table.insert(ESPObjects, bb)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "DivineESP"
+    billboard.Adornee = target:FindFirstChild("Head")
+    billboard.Size = UDim2.new(0, 100, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = target:FindFirstChild("Head")
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.Text = target.Name
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 14
+    label.TextColor3 = Color3.new(0, 1, 1)
+    label.TextStrokeTransparency = 0
+    label.Parent = billboard
+    table.insert(ESPObjects, billboard)
 end
 
 local function ClearESP()
-    for _, o in pairs(ESPObjects) do if o then o:Destroy() end end
+    for _, obj in pairs(ESPObjects) do
+        if obj then obj:Destroy() end
+    end
     ESPObjects = {}
 end
 
@@ -86,649 +42,518 @@ local function UpdateESP()
     ClearESP()
     if not ESPEnabled then return end
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= Players.LocalPlayer and p.Character then CreateESP(p.Character) end
-    end
-    local en = workspace:FindFirstChild("Enemies")
-    if en then for _, n in pairs(en:GetChildren()) do CreateESP(n) end end
-end
-
--- ══════════════════════════════════════════
--- FAST ATTACK
--- ══════════════════════════════════════════
-local FastAttackEnabled = false
-local FastAttackRange   = 5000
-local FAConn            = nil
-
--- BUG CORREGIDO #3: WaitForChild bloqueaba el hilo principal hasta 10s
--- antes de que el GUI siquiera apareciera. Movido a task.spawn.
-local Net, RegHit, RegAtk = nil, nil, nil
-task.spawn(function()
-    local ok, modules = pcall(function()
-        return ReplicatedStorage:WaitForChild("Modules", 5)
-    end)
-    if not ok or not modules then return end
-    local ok2, net = pcall(function()
-        return modules:WaitForChild("Net", 5)
-    end)
-    if not ok2 or not net then return end
-    Net = net
-    pcall(function() RegHit = Net["RE/RegisterHit"] end)
-    pcall(function() RegAtk = Net["RE/RegisterAttack"] end)
-end)
-
-local function DoAttack(targets)
-    if not RegHit or not RegAtk then return end
-    pcall(function()
-        if #targets == 0 then return end
-        local all = {}
-        for _, c in pairs(targets) do
-            local h = c:FindFirstChild("Head")
-            if h then table.insert(all, {c, h}) end
+        if p ~= Players.LocalPlayer and p.Character then
+            CreateESP(p.Character)
         end
-        if #all == 0 then return end
-        RegAtk:FireServer(0); RegHit:FireServer(all[1][2], all)
+    end
+    local enemies = workspace:FindFirstChild("Enemies")
+    if enemies then
+        for _, npc in pairs(enemies:GetChildren()) do
+            CreateESP(npc)
+        end
+    end
+end
+
+-- ==================== FAST ATTACK ====================
+local FastAttackEnabled = false
+local FastAttackRange = 5000
+local FastAttackConnection = nil
+
+local Net = ReplicatedStorage:WaitForChild("Modules", 5) and
+            ReplicatedStorage.Modules:WaitForChild("Net", 5)
+local RegisterHit = Net and pcall(function() return Net["RE/RegisterHit"] end) and Net["RE/RegisterHit"]
+local RegisterAttack = Net and pcall(function() return Net["RE/RegisterAttack"] end) and Net["RE/RegisterAttack"]
+
+local function AttackMultipleTargets(targets)
+    if not RegisterHit or not RegisterAttack then return end
+    pcall(function()
+        if not targets or #targets == 0 then return end
+        local allTargets = {}
+        for _, char in pairs(targets) do
+            local head = char:FindFirstChild("Head")
+            if head then table.insert(allTargets, {char, head}) end
+        end
+        if #allTargets == 0 then return end
+        RegisterAttack:FireServer(0)
+        RegisterHit:FireServer(allTargets[1][2], allTargets)
     end)
 end
 
-local function StartFA()
-    if FAConn then task.cancel(FAConn) end
-    FAConn = task.spawn(function()
+local function StartFastAttack()
+    if FastAttackConnection then task.cancel(FastAttackConnection) end
+    FastAttackConnection = task.spawn(function()
         while FastAttackEnabled do
             RunService.Stepped:Wait()
-            local myC = Players.LocalPlayer.Character
-            local myH = myC and myC:FindFirstChild("HumanoidRootPart")
-            if not myH then continue end
-            local t = {}
-            for _, pl in pairs(Players:GetPlayers()) do
-                if pl ~= Players.LocalPlayer and pl.Character then
-                    local hum = pl.Character:FindFirstChild("Humanoid")
-                    local hrp = pl.Character:FindFirstChild("HumanoidRootPart")
+            local myChar = Players.LocalPlayer.Character
+            local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            if not myHRP then continue end
+            local targets = {}
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= Players.LocalPlayer and player.Character then
+                    local hum = player.Character:FindFirstChild("Humanoid")
+                    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
                     if hum and hrp and hum.Health > 0 and
-                        (hrp.Position-myH.Position).Magnitude <= FastAttackRange then
-                        table.insert(t, pl.Character)
+                        (hrp.Position - myHRP.Position).Magnitude <= FastAttackRange then
+                        table.insert(targets, player.Character)
                     end
                 end
             end
-            local en = workspace:FindFirstChild("Enemies")
-            if en then
-                for _, n in pairs(en:GetChildren()) do
-                    local hum = n:FindFirstChild("Humanoid")
-                    local hrp = n:FindFirstChild("HumanoidRootPart")
+            local enemies = workspace:FindFirstChild("Enemies")
+            if enemies then
+                for _, npc in pairs(enemies:GetChildren()) do
+                    local hum = npc:FindFirstChild("Humanoid")
+                    local hrp = npc:FindFirstChild("HumanoidRootPart")
                     if hum and hrp and hum.Health > 0 and
-                        (hrp.Position-myH.Position).Magnitude <= FastAttackRange then
-                        table.insert(t, n)
+                        (hrp.Position - myHRP.Position).Magnitude <= FastAttackRange then
+                        table.insert(targets, npc)
                     end
                 end
             end
-            if #t > 0 then DoAttack(t) end
+            if #targets > 0 then AttackMultipleTargets(targets) end
         end
     end)
 end
 
--- ══════════════════════════════════════════
--- GUI ROOT
--- ══════════════════════════════════════════
+-- ==================== GUI ====================
 local pgui = Players.LocalPlayer:WaitForChild("PlayerGui")
-if pgui:FindFirstChild("DivineGold") then pgui.DivineGold:Destroy() end
+if pgui:FindFirstChild("DivineHub_Premium") then pgui.DivineHub_Premium:Destroy() end
 
-local SG = Instance.new("ScreenGui", pgui)
-SG.Name = "DivineGold"; SG.ResetOnSpawn = false
-SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+local screenGui = Instance.new("ScreenGui", pgui)
+screenGui.Name = "DivineHub_Premium"
+screenGui.ResetOnSpawn = false
 
--- ══════════════════════════════════════════
--- VENTANA PRINCIPAL
--- SIN ClipsDescendants, SIN animación de Size en apertura
--- ══════════════════════════════════════════
-local W, H = 430, 530
-local FULL = UDim2.new(0,W,0,H)
-local MINI = UDim2.new(0,200,0,50)
+local mainFrame = Instance.new("Frame", screenGui)
+local normalSize = UDim2.new(0, 420, 0, 550)
+local minimizedSize = UDim2.new(0, 150, 0, 40)
+mainFrame.Size = normalSize
+mainFrame.Position = UDim2.new(0.5, -210, 0.15, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 28)
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.BorderSizePixel = 0
 
-local win = Instance.new("Frame", SG)
-win.Name = "Win"; win.Size = FULL
-win.Position = UDim2.new(0.5,-W/2, 0.1, 0)
-win.BackgroundColor3 = BG_MAIN
--- BUG CORREGIDO #1: win.Active = true absorbía los clicks antes de que
--- llegaran a btnClose y btnMin. Se elimina Active+Draggable del win
--- y se implementa drag manual solo en la zona del header (sin los botones).
-win.BorderSizePixel = 0
-corner(win, 12)
-stroke(win, GOLD_DK, 1.5)
-
--- gradiente de fondo
-local bg = Instance.new("UIGradient", win)
-bg.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(18,17,24)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 7,12)),
-}
-bg.Rotation = 130
-
--- ══════════════════════════════════════════
--- HEADER
--- ══════════════════════════════════════════
-local hdr = Instance.new("Frame", win)
-hdr.Size = UDim2.new(1,0,0,56); hdr.Position = UDim2.new(0,0,0,0)
-hdr.BackgroundColor3 = Color3.fromRGB(8,7,12)
-hdr.BorderSizePixel = 0; corner(hdr, 12)
-
--- línea dorada inferior del header
-local hline = Instance.new("Frame", hdr)
-hline.Size = UDim2.new(0.78,0,0,1)
-hline.Position = UDim2.new(0.11,0,1,-1)
-hline.BackgroundColor3 = GOLD; hline.BorderSizePixel = 0
-local hlG = Instance.new("UIGradient", hline)
-hlG.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0,   Color3.fromRGB(0,0,0)),
-    ColorSequenceKeypoint.new(0.3, GOLD),
-    ColorSequenceKeypoint.new(0.7, GOLD),
-    ColorSequenceKeypoint.new(1,   Color3.fromRGB(0,0,0)),
+local gradient = Instance.new("UIGradient", mainFrame)
+gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 40)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 25))
 }
 
--- ícono crown
-local crown = label(hdr, "♛", 22, GOLD, Enum.Font.GothamBold, Enum.TextXAlignment.Center)
-crown.Size = UDim2.new(0,34,0,34); crown.Position = UDim2.new(0,12,0.5,-17)
+local corner = Instance.new("UICorner", mainFrame)
+corner.CornerRadius = UDim.new(0, 12)
 
--- título
-local ttl = label(hdr, "DIVINE HUB", 16, GOLD_LT)
-ttl.Size = UDim2.new(0,180,0,22); ttl.Position = UDim2.new(0,52,0,8)
+local stroke = Instance.new("UIStroke", mainFrame)
+stroke.Color = Color3.fromRGB(100, 50, 255)
+stroke.Thickness = 2
 
-local sub = label(hdr, "P R E M I U M   ·   G O L D", 8, DIM, Enum.Font.Gotham)
-sub.Size = UDim2.new(0,200,0,16); sub.Position = UDim2.new(0,53,0,32)
+local topBar = Instance.new("Frame", mainFrame)
+topBar.Size = UDim2.new(1, 0, 0, 50)
+topBar.BackgroundColor3 = Color3.fromRGB(25, 15, 50)
+topBar.BorderSizePixel = 0
 
--- botones X y −
-local function mkCtrl(sym, offX, col)
-    local b = Instance.new("TextButton", hdr)
-    b.Size = UDim2.new(0,26,0,26)
-    b.Position = UDim2.new(1,offX,0.5,-13)
-    b.Text = sym; b.Font = Enum.Font.GothamBold
-    b.TextSize = 13; b.TextColor3 = WHITE
-    b.BackgroundColor3 = col; b.BorderSizePixel = 0
-    corner(b, 7)
-    b.MouseEnter:Connect(function() tween(b,0.12,{BackgroundTransparency=0.3}) end)
-    b.MouseLeave:Connect(function() tween(b,0.12,{BackgroundTransparency=0}) end)
-    return b
-end
-local btnClose = mkCtrl("✕", -40, RED)
-local btnMin   = mkCtrl("−", -72, Color3.fromRGB(50,45,25))
+local topBarGradient = Instance.new("UIGradient", topBar)
+topBarGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 50, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 25, 150))
+}
 
--- ══════════════════════════════════════════
--- BARRA DE TABS
--- ══════════════════════════════════════════
-local navBg = Instance.new("Frame", win)
-navBg.Size = UDim2.new(1,-24,0,36); navBg.Position = UDim2.new(0,12,0,64)
-navBg.BackgroundColor3 = BG_NAV; navBg.BorderSizePixel = 0
-corner(navBg, 9); stroke(navBg, Color3.fromRGB(38,33,14), 1)
+local topCorner = Instance.new("UICorner", topBar)
+topCorner.CornerRadius = UDim.new(0, 12)
 
-local navList = Instance.new("UIListLayout", navBg)
-navList.FillDirection = Enum.FillDirection.Horizontal
-navList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-navList.VerticalAlignment = Enum.VerticalAlignment.Center
-navList.Padding = UDim.new(0,2)
+local logoLabel = Instance.new("TextLabel", topBar)
+logoLabel.Size = UDim2.new(0, 40, 0, 40)
+logoLabel.Position = UDim2.new(0, 10, 0.5, -20)
+logoLabel.Text = "👑"
+logoLabel.TextSize = 28
+logoLabel.BackgroundTransparency = 1
+logoLabel.Font = Enum.Font.GothamBold
 
--- ══════════════════════════════════════════
--- ÁREA DE CONTENIDO
--- ══════════════════════════════════════════
-local content = Instance.new("Frame", win)
-content.Size = UDim2.new(1,-24,1,-110)
-content.Position = UDim2.new(0,12,0,108)
-content.BackgroundTransparency = 1
--- BUG CORREGIDO (parte de #2): ClipsDescendants evita overflow visual
-content.ClipsDescendants = true
+local titleLabel = Instance.new("TextLabel", topBar)
+titleLabel.Size = UDim2.new(0.6, 0, 1, 0)
+titleLabel.Position = UDim2.new(0, 55, 0, 0)
+titleLabel.Text = "DIVINE HUB PREMIUM"
+titleLabel.TextColor3 = Color3.new(1, 1, 1)
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 16
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.BackgroundTransparency = 1
 
--- ══════════════════════════════════════════
--- PÁGINAS
--- ══════════════════════════════════════════
-local function mkPage(name)
-    local sf = Instance.new("ScrollingFrame", content)
-    sf.Name = name
-    sf.Size = UDim2.new(1,0,1,0)
-    sf.BackgroundTransparency = 1; sf.BorderSizePixel = 0
-    sf.ScrollBarThickness = 3; sf.ScrollBarImageColor3 = GOLD_DK
-    -- BUG CORREGIDO #2: CanvasSize = UDim2(0,0,0,0) + AutomaticCanvasSize
-    -- NO funciona en muchos entornos/executors. El canvas se queda en 0px
-    -- de alto y CLIPEA todo el contenido → páginas aparecen vacías.
-    -- Solución: canvas fijo amplio como fallback; AutomaticCanvasSize
-    -- lo sobreescribe si funciona, si no, el contenido igual se ve.
-    sf.CanvasSize = UDim2.new(0,0,0,800)
-    sf.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    sf.Visible = false
-    local ul = Instance.new("UIListLayout", sf)
-    ul.Padding = UDim.new(0,8)
-    ul.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    ul.SortOrder = Enum.SortOrder.LayoutOrder
-    local up = Instance.new("UIPadding", sf)
-    up.PaddingTop = UDim.new(0,6); up.PaddingBottom = UDim.new(0,10)
-    return sf
+local versionLabel = Instance.new("TextLabel", topBar)
+versionLabel.Size = UDim2.new(0.3, 0, 0.5, 0)
+versionLabel.Position = UDim2.new(0, 55, 0.5, 0)
+versionLabel.Text = "v1.0 PREMIUM"
+versionLabel.TextColor3 = Color3.fromRGB(150, 100, 255)
+versionLabel.Font = Enum.Font.GothamBold
+versionLabel.TextSize = 10
+versionLabel.TextXAlignment = Enum.TextXAlignment.Left
+versionLabel.BackgroundTransparency = 1
+
+local function createControlBtn(text, position, color)
+    local btn = Instance.new("TextButton", topBar)
+    btn.Size = UDim2.new(0, 30, 0, 30)
+    btn.Position = position
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.BackgroundColor3 = color
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 16
+    btn.BorderSizePixel = 0
+    local c = Instance.new("UICorner", btn)
+    c.CornerRadius = UDim.new(0, 6)
+    return btn
 end
 
-local pgCombat  = mkPage("Combate")
-local pgMove    = mkPage("Mover")
-local pgSea2    = mkPage("Sea2")
-local pgSea3    = mkPage("Sea3")
-local pgVisual  = mkPage("Visual")
+local closeBtn    = createControlBtn("✕", UDim2.new(1, -40,  0.5, -15), Color3.fromRGB(200, 50, 50))
+local minimizeBtn = createControlBtn("−", UDim2.new(1, -75,  0.5, -15), Color3.fromRGB(100, 100, 150))
+local maximizeBtn = createControlBtn("+", UDim2.new(1, -110, 0.5, -15), Color3.fromRGB(100, 100, 150))
 
--- ══════════════════════════════════════════
--- TABS
--- ══════════════════════════════════════════
-local activeTab = nil
+local tabContainer = Instance.new("Frame", mainFrame)
+tabContainer.Size = UDim2.new(1, -20, 0, 45)
+tabContainer.Position = UDim2.new(0, 10, 0, 60)
+tabContainer.BackgroundTransparency = 1
 
-local function switchPage(page, btn)
-    for _, v in pairs(content:GetChildren()) do
-        if v:IsA("ScrollingFrame") then v.Visible = (v == page) end
+local tabLayout = Instance.new("UIListLayout", tabContainer)
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.Padding = UDim.new(0, 5)
+tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local contentFrame = Instance.new("Frame", mainFrame)
+contentFrame.Size = UDim2.new(1, -20, 1, -130)
+contentFrame.Position = UDim2.new(0, 10, 0, 115)
+contentFrame.BackgroundTransparency = 1
+
+local function createPage(name)
+    local p = Instance.new("ScrollingFrame", contentFrame)
+    p.Name = name
+    p.Size = UDim2.new(1, 0, 1, 0)
+    p.BackgroundTransparency = 1
+    p.BorderSizePixel = 0
+    p.ScrollBarThickness = 4
+    p.ScrollBarImageColor3 = Color3.fromRGB(100, 50, 255)
+    p.Visible = false
+    local layout = Instance.new("UIListLayout", p)
+    layout.Padding = UDim.new(0, 8)
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    return p
+end
+
+local combatPage  = createPage("Combate")
+local movePage    = createPage("Movimiento")
+local sea2Page    = createPage("Sea2")
+local sea3Page    = createPage("Sea3")
+local visualsPage = createPage("Visuals")
+
+local function showPage(page)
+    for _, v in pairs(contentFrame:GetChildren()) do
+        if v:IsA("ScrollingFrame") then v.Visible = false end
     end
-    if activeTab and activeTab ~= btn then
-        tween(activeTab, 0.15, {BackgroundColor3=BG_NAV, TextColor3=DIM})
-    end
-    activeTab = btn
-    tween(btn, 0.15, {BackgroundColor3=GOLD_FAINT, TextColor3=GOLD_LT})
+    page.Visible = true
 end
 
-local function mkTab(txt, page)
-    local b = Instance.new("TextButton", navBg)
-    b.Size = UDim2.new(0,74,0,28)
-    b.Text = txt; b.Font = Enum.Font.GothamBold
-    b.TextSize = 10; b.TextColor3 = DIM
-    b.BackgroundColor3 = BG_NAV; b.BorderSizePixel = 0
-    corner(b, 7)
-    b.MouseButton1Click:Connect(function() switchPage(page, b) end)
-    b.MouseEnter:Connect(function()
-        if activeTab ~= b then tween(b,0.12,{TextColor3=GOLD}) end
-    end)
-    b.MouseLeave:Connect(function()
-        if activeTab ~= b then tween(b,0.12,{TextColor3=DIM}) end
-    end)
-    return b
+local function createTab(name, page)
+    local b = Instance.new("TextButton", tabContainer)
+    b.Size = UDim2.new(0, 90, 0, 38)
+    b.Text = name
+    b.BackgroundColor3 = Color3.fromRGB(30, 20, 60)
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 11
+    b.BorderSizePixel = 0
+    local c = Instance.new("UICorner", b)
+    c.CornerRadius = UDim.new(0, 8)
+    local s = Instance.new("UIStroke", b)
+    s.Color = Color3.fromRGB(100, 50, 255)
+    s.Thickness = 1
+    b.MouseButton1Click:Connect(function() showPage(page) end)
 end
 
-local tabCombat = mkTab("⚔ Combate", pgCombat)
-local tabMove   = mkTab("🏃 Mover",   pgMove)
-local tabSea2   = mkTab("🌊 Sea 2",   pgSea2)
-local tabSea3   = mkTab("🏰 Sea 3",   pgSea3)
-local tabVisual = mkTab("✦ Visual",  pgVisual)
+createTab("⚔️ Combate", combatPage)
+createTab("🏃 Mov",     movePage)
+createTab("🌊 Sea 2",   sea2Page)
+createTab("🏰 Sea 3",   sea3Page)
+createTab("🖥️ Visuals", visualsPage)
 
--- ══════════════════════════════════════════
--- SEPARATOR DE SECCIÓN
--- ══════════════════════════════════════════
-local function mkSep(txt, page, ord)
-    local f = Instance.new("Frame", page)
-    f.Size = UDim2.new(0.96,0,0,20); f.BackgroundTransparency = 1
-    f.LayoutOrder = ord or 0
+showPage(combatPage)
 
-    local line = Instance.new("Frame", f)
-    line.Size = UDim2.new(1,0,0,1); line.Position = UDim2.new(0,0,0.5,0)
-    line.BackgroundColor3 = Color3.fromRGB(38,34,14); line.BorderSizePixel = 0
-
-    local bg2 = Instance.new("Frame", f)
-    bg2.Size = UDim2.new(0,90,1,0); bg2.Position = UDim2.new(0,8,0,0)
-    bg2.BackgroundColor3 = BG_MAIN; bg2.BorderSizePixel = 0
-
-    local lbl = label(bg2, "  "..txt.."  ", 8, GOLD_DK, Enum.Font.GothamBold, Enum.TextXAlignment.Left)
-    lbl.Size = UDim2.new(1,0,1,0); lbl.TextTracking = 3
-end
-
--- ══════════════════════════════════════════
--- TOGGLE CARD
--- Retorna: botón, setState(bool), getState()
--- ══════════════════════════════════════════
-local function mkToggle(txt, page, ord)
-    -- card contenedor
-    local card = Instance.new("Frame", page)
-    card.Size = UDim2.new(0.96,0,0,50)
-    card.BackgroundColor3 = BG_CARD
-    card.BorderSizePixel = 0; card.LayoutOrder = ord or 1
-    corner(card, 10)
-    local cS = stroke(card, Color3.fromRGB(40,36,16), 1)
-
-    -- barra izquierda
-    local bar = Instance.new("Frame", card)
-    bar.Size = UDim2.new(0,3,0,22); bar.Position = UDim2.new(0,0,0.5,-11)
-    bar.BackgroundColor3 = GOLD_DK; bar.BorderSizePixel = 0; corner(bar,2)
-
-    -- texto
-    local lbl = label(card, txt, 13, WHITE)
-    lbl.Size = UDim2.new(0.58,0,1,0); lbl.Position = UDim2.new(0,14,0,0)
-
-    -- fondo del pill
-    local pbg = Instance.new("Frame", card)
-    pbg.Size = UDim2.new(0,44,0,22); pbg.Position = UDim2.new(1,-52,0.5,-11)
-    pbg.BackgroundColor3 = Color3.fromRGB(28,26,16); pbg.BorderSizePixel = 0
-    corner(pbg, 11); stroke(pbg, Color3.fromRGB(50,45,18), 1)
-
-    -- círculo del pill
-    local pill = Instance.new("Frame", pbg)
-    pill.Size = UDim2.new(0,16,0,16); pill.Position = UDim2.new(0,3,0.5,-8)
-    pill.BackgroundColor3 = DIM; pill.BorderSizePixel = 0; corner(pill,8)
-
-    local enabled = false
-
-    local function setState(on)
-        enabled = on
-        if on then
-            tween(pill,  0.15, {Position=UDim2.new(0,25,0.5,-8), BackgroundColor3=GOLD_LT})
-            tween(pbg,   0.15, {BackgroundColor3=GOLD_DK})
-            tween(bar,   0.15, {BackgroundColor3=GOLD})
-            tween(lbl,   0.15, {TextColor3=GOLD_LT})
-            tween(cS,    0.15, {Color=GOLD_DK})
-        else
-            tween(pill,  0.15, {Position=UDim2.new(0,3,0.5,-8), BackgroundColor3=DIM})
-            tween(pbg,   0.15, {BackgroundColor3=Color3.fromRGB(28,26,16)})
-            tween(bar,   0.15, {BackgroundColor3=GOLD_DK})
-            tween(lbl,   0.15, {TextColor3=WHITE})
-            tween(cS,    0.15, {Color=Color3.fromRGB(40,36,16)})
-        end
-    end
-
-    -- El botón cubre toda la card — NO usa ZIndex elevado
-    local btn = Instance.new("TextButton", card)
-    btn.Size = UDim2.new(1,0,1,0); btn.BackgroundTransparency = 1
-    btn.Text = ""; btn.BorderSizePixel = 0
-
-    btn.MouseButton1Click:Connect(function()
-        setState(not enabled)
-    end)
-    btn.MouseEnter:Connect(function() tween(card,0.12,{BackgroundColor3=BG_HOVER}) end)
-    btn.MouseLeave:Connect(function() tween(card,0.12,{BackgroundColor3=BG_CARD}) end)
-
-    return btn, setState, function() return enabled end
-end
-
--- ══════════════════════════════════════════
--- BOTÓN ACCIÓN (teleport)
--- ══════════════════════════════════════════
-local function mkAction(txt, ico, page, ord)
-    local card = Instance.new("Frame", page)
-    card.Size = UDim2.new(0.96,0,0,48)
-    card.BackgroundColor3 = BG_CARD; card.BorderSizePixel = 0
-    card.LayoutOrder = ord or 1; corner(card,10)
-    local cs = stroke(card, Color3.fromRGB(40,36,16), 1)
-
-    local icoL = label(card, ico, 18, GOLD, Enum.Font.GothamBold, Enum.TextXAlignment.Center)
-    icoL.Size = UDim2.new(0,30,1,0); icoL.Position = UDim2.new(0,10,0,0)
-
-    local lbl = label(card, txt, 13, WHITE)
-    lbl.Size = UDim2.new(0.65,0,1,0); lbl.Position = UDim2.new(0,46,0,0)
-
-    local arr = label(card, "›", 22, GOLD_DK, Enum.Font.GothamBold, Enum.TextXAlignment.Center)
-    arr.Size = UDim2.new(0,18,1,0); arr.Position = UDim2.new(1,-26,0,0)
-
-    local btn = Instance.new("TextButton", card)
-    btn.Size = UDim2.new(1,0,1,0); btn.BackgroundTransparency = 1
-    btn.Text = ""; btn.BorderSizePixel = 0
-
+local function addBtn(txt, color, parent)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(0.95, 0, 0, 40)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 20, 50)
+    btn.Text = txt
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 12
+    btn.BorderSizePixel = 0
+    local c = Instance.new("UICorner", btn)
+    c.CornerRadius = UDim.new(0, 8)
+    local s = Instance.new("UIStroke", btn)
+    s.Color = color
+    s.Thickness = 2
     btn.MouseEnter:Connect(function()
-        tween(card,0.12,{BackgroundColor3=BG_HOVER})
-        tween(cs,  0.12,{Color=GOLD_DK})
-        tween(arr, 0.12,{Position=UDim2.new(1,-20,0,0), TextColor3=GOLD})
+        btn:TweenSize(UDim2.new(0.98, 0, 0, 42), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
     end)
     btn.MouseLeave:Connect(function()
-        tween(card,0.12,{BackgroundColor3=BG_CARD})
-        tween(cs,  0.12,{Color=Color3.fromRGB(40,36,16)})
-        tween(arr, 0.12,{Position=UDim2.new(1,-26,0,0), TextColor3=GOLD_DK})
-    end)
-    btn.MouseButton1Down:Connect(function()
-        tween(card,0.07,{BackgroundColor3=Color3.fromRGB(38,34,14)})
-    end)
-    btn.MouseButton1Up:Connect(function()
-        tween(card,0.12,{BackgroundColor3=BG_HOVER})
+        btn:TweenSize(UDim2.new(0.95, 0, 0, 40), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
     end)
     return btn
 end
 
--- ══════════════════════════════════════════
--- COMBATE
--- ══════════════════════════════════════════
-mkSep("COMBATE", pgCombat, 1)
-
-local faBtn, faSet, faGet = mkToggle("Fast Attack", pgCombat, 2)
-faBtn.MouseButton1Click:Connect(function()
-    task.defer(function()
-        FastAttackEnabled = faGet()
-        if FastAttackEnabled then StartFA()
-        elseif FAConn then task.cancel(FAConn) end
-    end)
+-- ===== COMBATE =====
+local fBtn = addBtn("⚡ Fast Attack: OFF", Color3.fromRGB(255, 200, 0), combatPage)
+fBtn.MouseButton1Click:Connect(function()
+    FastAttackEnabled = not FastAttackEnabled
+    fBtn.Text = FastAttackEnabled and "⚡ Fast Attack: ON" or "⚡ Fast Attack: OFF"
+    if FastAttackEnabled then
+        StartFastAttack()
+    else
+        if FastAttackConnection then task.cancel(FastAttackConnection) end
+    end
 end)
 
-local espBtn, espSet, espGet = mkToggle("Player ESP", pgCombat, 3)
+local espBtn = addBtn("👁️ ESP: OFF", Color3.fromRGB(255, 150, 100), combatPage)
 espBtn.MouseButton1Click:Connect(function()
-    task.defer(function()
-        ESPEnabled = espGet()
-        UpdateESP()
-    end)
+    ESPEnabled = not ESPEnabled
+    espBtn.Text = ESPEnabled and "👁️ ESP: ON" or "👁️ ESP: OFF"
+    UpdateESP()
 end)
 
 task.spawn(function()
-    while true do task.wait(5); if ESPEnabled then UpdateESP() end end
+    while true do
+        task.wait(5)
+        if ESPEnabled then UpdateESP() end
+    end
 end)
 
--- ══════════════════════════════════════════
--- MOVIMIENTO
--- ══════════════════════════════════════════
-mkSep("MOVIMIENTO", pgMove, 1)
+-- ===== MOVIMIENTO =====
+local sBtn = addBtn("🚀 Speed Controller: OFF", Color3.fromRGB(0, 200, 200), movePage)
 
-local sBtn, sSet, sGet = mkToggle("Speed Boost", pgMove, 2)
-local sVal = 16
+local speedPanel = Instance.new("Frame", screenGui)
+speedPanel.Size = UDim2.new(0, 150, 0, 50)
+speedPanel.Position = UDim2.new(0, 20, 0.45, 0)
+speedPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+speedPanel.Visible = false
+speedPanel.Active = true
+speedPanel.Draggable = true
+speedPanel.BorderSizePixel = 0
+local speedCorner = Instance.new("UICorner", speedPanel)
+speedCorner.CornerRadius = UDim.new(0, 8)
+local speedStroke = Instance.new("UIStroke", speedPanel)
+speedStroke.Color = Color3.fromRGB(100, 200, 255)
+speedStroke.Thickness = 2
 
--- Panel flotante velocidad
-local spanel = Instance.new("Frame", SG)
-spanel.Size = UDim2.new(0,160,0,52); spanel.Position = UDim2.new(0,18,0.4,0)
-spanel.BackgroundColor3 = BG_CARD; spanel.Visible = false
-spanel.Active = true; spanel.Draggable = true; spanel.BorderSizePixel = 0
-corner(spanel, 10); stroke(spanel, GOLD_DK, 1)
+local btnM = Instance.new("TextButton", speedPanel)
+btnM.Size = UDim2.new(0, 35, 0, 35)
+btnM.Position = UDim2.new(0.05, 0, 0.5, -17)
+btnM.Text = "−"
+btnM.BackgroundColor3 = Color3.fromRGB(50, 50, 100)
+btnM.TextColor3 = Color3.new(1, 1, 1)
+btnM.Font = Enum.Font.GothamBold
+btnM.TextSize = 18
+btnM.BorderSizePixel = 0
+local btnMCorner = Instance.new("UICorner", btnM)
+btnMCorner.CornerRadius = UDim.new(0, 6)
 
-local spT = label(spanel, "VELOCIDAD", 8, DIM, Enum.Font.GothamBold, Enum.TextXAlignment.Center)
-spT.Size = UDim2.new(1,0,0,16); spT.Position = UDim2.new(0,0,0,4)
+local sDisp = Instance.new("TextLabel", speedPanel)
+sDisp.Size = UDim2.new(0, 50, 1, 0)
+sDisp.Position = UDim2.new(0.35, 0, 0, 0)
+sDisp.Text = "16"
+sDisp.TextColor3 = Color3.fromRGB(100, 200, 255)
+sDisp.Font = Enum.Font.GothamBold
+sDisp.TextSize = 16
+sDisp.BackgroundTransparency = 1
 
-local function mkSpBtn(sym, px)
-    local b = Instance.new("TextButton", spanel)
-    b.Size = UDim2.new(0,30,0,24); b.Position = UDim2.new(0,px,1,-30)
-    b.Text = sym; b.Font = Enum.Font.GothamBold; b.TextSize = 16
-    b.TextColor3 = GOLD; b.BackgroundColor3 = BG_MAIN; b.BorderSizePixel = 0
-    corner(b,6); stroke(b,GOLD_DK,1)
-    b.MouseEnter:Connect(function() tween(b,0.12,{BackgroundColor3=BG_HOVER}) end)
-    b.MouseLeave:Connect(function() tween(b,0.12,{BackgroundColor3=BG_MAIN}) end)
-    return b
-end
-local btnM = mkSpBtn("−", 8)
-local sDisp = label(spanel, "16", 14, GOLD_LT, Enum.Font.GothamBold, Enum.TextXAlignment.Center)
-sDisp.Size = UDim2.new(0,44,0,24); sDisp.Position = UDim2.new(0.5,-22,1,-30)
-local btnP = mkSpBtn("+", 122)
+local btnP = Instance.new("TextButton", speedPanel)
+btnP.Size = UDim2.new(0, 35, 0, 35)
+btnP.Position = UDim2.new(0.6, 0, 0.5, -17)
+btnP.Text = "+"
+btnP.BackgroundColor3 = Color3.fromRGB(50, 50, 100)
+btnP.TextColor3 = Color3.new(1, 1, 1)
+btnP.Font = Enum.Font.GothamBold
+btnP.TextSize = 18
+btnP.BorderSizePixel = 0
+local btnPCorner = Instance.new("UICorner", btnP)
+btnPCorner.CornerRadius = UDim.new(0, 6)
 
-btnP.MouseButton1Click:Connect(function() sVal=math.clamp(sVal+10,16,500); sDisp.Text=tostring(sVal) end)
-btnM.MouseButton1Click:Connect(function() sVal=math.clamp(sVal-10,16,500); sDisp.Text=tostring(sVal) end)
-sBtn.MouseButton1Click:Connect(function() task.defer(function() spanel.Visible = sGet() end) end)
+local sVal, sAct = 16, false
+sBtn.MouseButton1Click:Connect(function()
+    sAct = not sAct
+    speedPanel.Visible = sAct
+    sBtn.Text = sAct and "🚀 Speed Controller: ON" or "🚀 Speed Controller: OFF"
+end)
+btnP.MouseButton1Click:Connect(function()
+    sVal = math.clamp(sVal + 10, 16, 500)
+    sDisp.Text = tostring(sVal)
+end)
+btnM.MouseButton1Click:Connect(function()
+    sVal = math.clamp(sVal - 10, 16, 500)
+    sDisp.Text = tostring(sVal)
+end)
 
 RunService.Heartbeat:Connect(function()
-    if sGet() then
+    if sAct then
         local char = Players.LocalPlayer.Character
-        local hum  = char and char:FindFirstChild("Humanoid")
+        local hum = char and char:FindFirstChild("Humanoid")
         if hum and hum.MoveDirection.Magnitude > 0 then
             char:TranslateBy(hum.MoveDirection * (sVal / 55))
         end
     end
 end)
 
-local jBtn, jSet, jGet = mkToggle("Infinite Jump", pgMove, 3)
+local jBtn = addBtn("⬆️ Infinite Jump: OFF", Color3.fromRGB(100, 200, 255), movePage)
+local iJ = false
+jBtn.MouseButton1Click:Connect(function()
+    iJ = not iJ
+    jBtn.Text = iJ and "⬆️ Infinite Jump: ON" or "⬆️ Infinite Jump: OFF"
+end)
 UserInputService.JumpRequest:Connect(function()
-    if jGet() then
-        local c = Players.LocalPlayer.Character
-        local h = c and c:FindFirstChild("Humanoid")
-        if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+    if iJ then
+        local char = Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
     end
 end)
 
-local ncBtn, ncSet, ncGet = mkToggle("No Clip", pgMove, 4)
+local nBtn = addBtn("🔥 No Clip: OFF", Color3.fromRGB(200, 100, 255), movePage)
+local ncl = false
+nBtn.MouseButton1Click:Connect(function()
+    ncl = not ncl
+    nBtn.Text = ncl and "🔥 No Clip: ON" or "🔥 No Clip: OFF"
+end)
 RunService.Stepped:Connect(function()
-    if ncGet() then
-        local c = Players.LocalPlayer.Character
-        if c then for _,v in pairs(c:GetDescendants()) do
-            if v:IsA("BasePart") then v.CanCollide = false end
-        end end
+    if ncl then
+        local char = Players.LocalPlayer.Character
+        if char then
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("BasePart") then v.CanCollide = false end
+            end
+        end
     end
 end)
 
-local wwBtn, wwSet, wwGet = mkToggle("Walk on Water", pgMove, 5)
+local wowBtn = addBtn("💧 Walk on Water: OFF", Color3.fromRGB(0, 200, 255), movePage)
+local walkWaterEnabled = false
+wowBtn.MouseButton1Click:Connect(function()
+    walkWaterEnabled = not walkWaterEnabled
+    wowBtn.Text = walkWaterEnabled and "💧 Walk on Water: ON" or "💧 Walk on Water: OFF"
+end)
 RunService.RenderStepped:Connect(function()
-    local c = Players.LocalPlayer.Character
-    local hrp = c and c:FindFirstChild("HumanoidRootPart")
-    if wwGet() and hrp then
+    local char = Players.LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if walkWaterEnabled and hrp then
         if hrp.Position.Y >= 9.5 and hrp.AssemblyLinearVelocity.Y <= 0 then
-            local w = workspace:FindFirstChild("DivineWater")
-            if not w then
-                w = Instance.new("Part", workspace); w.Name = "DivineWater"
-                w.Size = Vector3.new(20,1,20); w.Transparency = 1
-                w.Anchored = true; w.CanCollide = true; w.CanQuery = false
+            local waterPart = workspace:FindFirstChild("DivineWaterSolid")
+            if not waterPart then
+                waterPart = Instance.new("Part", workspace)
+                waterPart.Name = "DivineWaterSolid"
+                waterPart.Size = Vector3.new(20, 1, 20)
+                waterPart.Transparency = 1
+                waterPart.Anchored = true
+                waterPart.CanCollide = true
+                waterPart.CanQuery = false
             end
-            w.CFrame = CFrame.new(hrp.Position.X, 9.2, hrp.Position.Z)
+            waterPart.CFrame = CFrame.new(hrp.Position.X, 9.2, hrp.Position.Z)
         else
-            local w = workspace:FindFirstChild("DivineWater"); if w then w:Destroy() end
+            local w = workspace:FindFirstChild("DivineWaterSolid")
+            if w then w:Destroy() end
         end
     else
-        local w = workspace:FindFirstChild("DivineWater"); if w then w:Destroy() end
+        local w = workspace:FindFirstChild("DivineWaterSolid")
+        if w then w:Destroy() end
     end
 end)
 
--- ══════════════════════════════════════════
--- SEA 2
--- ══════════════════════════════════════════
-mkSep("TELEPORTS", pgSea2, 1)
-local bBtn = mkAction("Barco Maldito", "🗺", pgSea2, 2)
-bBtn.MouseButton1Click:Connect(function()
-    Players.LocalPlayer.Character:PivotTo(CFrame.new(923,126,32852))
+-- ===== TELEPORTS SEA 2 =====
+addBtn("🗺️ Barco Maldito", Color3.fromRGB(0, 200, 150), sea2Page).MouseButton1Click:Connect(function()
+    Players.LocalPlayer.Character:PivotTo(CFrame.new(923, 126, 32852))
 end)
 
--- ══════════════════════════════════════════
--- SEA 3
--- ══════════════════════════════════════════
-mkSep("TELEPORTS", pgSea3, 1)
-local castBtn = mkAction("Castillo", "🏰", pgSea3, 2)
-castBtn.MouseButton1Click:Connect(function()
-    Players.LocalPlayer.Character:PivotTo(CFrame.new(-5085,316,-3156))
+-- ===== TELEPORTS SEA 3 =====
+addBtn("🏰 Castillo", Color3.fromRGB(150, 100, 255), sea3Page).MouseButton1Click:Connect(function()
+    Players.LocalPlayer.Character:PivotTo(CFrame.new(-5085, 316, -3156))
 end)
-local manBtn = mkAction("Mansión", "🏛", pgSea3, 3)
-manBtn.MouseButton1Click:Connect(function()
-    Players.LocalPlayer.Character:PivotTo(CFrame.new(-12463,375,-7523))
+addBtn("🏛️ Mansión", Color3.fromRGB(255, 170, 0), sea3Page).MouseButton1Click:Connect(function()
+    Players.LocalPlayer.Character:PivotTo(CFrame.new(-12463, 375, -7523))
 end)
 
--- ══════════════════════════════════════════
--- VISUALS
--- ══════════════════════════════════════════
-mkSep("RENDIMIENTO", pgVisual, 1)
+-- ===== VISUALS =====
+local boostFpsEnabled = false
+local boostBtn = addBtn("🚀 Boost FPS: OFF", Color3.fromRGB(0, 220, 120), visualsPage)
+boostBtn.MouseButton1Click:Connect(function()
+    boostFpsEnabled = not boostFpsEnabled
+    boostBtn.Text = boostFpsEnabled and "🚀 Boost FPS: ON" or "🚀 Boost FPS: OFF"
 
-local fpsBtn, fpsSet, fpsGet = mkToggle("Boost FPS", pgVisual, 2)
-fpsBtn.MouseButton1Click:Connect(function()
-    task.defer(function()
-        local on = fpsGet()
-        local L = game:GetService("Lighting")
-        if on then
-            L.GlobalShadows = false; L.FogEnd = 100000
-            for _, fx in pairs(L:GetChildren()) do
-                if fx:IsA("BlurEffect") or fx:IsA("BloomEffect")
-                or fx:IsA("ColorCorrectionEffect") or fx:IsA("SunRaysEffect")
-                or fx:IsA("DepthOfFieldEffect") then fx.Enabled = false end
-            end
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v:IsA("ParticleEmitter") or v:IsA("Fire")
-                or v:IsA("Smoke") or v:IsA("Sparkles") then v.Enabled = false end
-            end
-            -- BUG CORREGIDO #4: settings() puede lanzar error en exploits
-            pcall(function()
-                settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-            end)
-        else
-            L.GlobalShadows = true
-            for _, fx in pairs(L:GetChildren()) do
-                if fx:IsA("BlurEffect") or fx:IsA("BloomEffect")
-                or fx:IsA("ColorCorrectionEffect") or fx:IsA("SunRaysEffect")
-                or fx:IsA("DepthOfFieldEffect") then fx.Enabled = true end
-            end
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v:IsA("ParticleEmitter") or v:IsA("Fire")
-                or v:IsA("Smoke") or v:IsA("Sparkles") then v.Enabled = true end
-            end
-            -- BUG CORREGIDO #4 (restaurar calidad)
-            pcall(function()
-                settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
-            end)
-        end
-    end)
-end)
+    if boostFpsEnabled then
+        -- Desactivar efectos visuales pesados
+        local lighting = game:GetService("Lighting")
+        lighting.GlobalShadows    = false
+        lighting.FogEnd           = 100000
+        lighting.Brightness       = 2
 
--- ══════════════════════════════════════════
--- CONTROLES VENTANA
--- ══════════════════════════════════════════
-local minimized = false
+        -- Eliminar efectos de post-procesado
+        for _, fx in pairs(lighting:GetChildren()) do
+            if fx:IsA("BlurEffect") or fx:IsA("BloomEffect")
+            or fx:IsA("ColorCorrectionEffect") or fx:IsA("SunRaysEffect")
+            or fx:IsA("DepthOfFieldEffect") then
+                fx.Enabled = false
+            end
+        end
 
--- BUG CORREGIDO #1 (continuación): Drag manual en la zona izquierda del
--- header para no interferir con los botones de la derecha.
-do
-    local dragging, dragStart, winStart = false, nil, nil
-    local dragZone = Instance.new("Frame", hdr)
-    dragZone.Size     = UDim2.new(1,-90,1,0)   -- cubre header excepto área de botones
-    dragZone.Position = UDim2.new(0,0,0,0)
-    dragZone.BackgroundTransparency = 1
-    dragZone.Active   = true                    -- solo esta zona absorbe el drag
-    dragZone.ZIndex   = 0                       -- detrás de botones
-    dragZone.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 or
-           inp.UserInputType == Enum.UserInputType.Touch then
-            dragging  = true
-            dragStart = inp.Position
-            winStart  = win.Position
+        -- Reducir calidad de partículas en el workspace
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") then
+                v.Enabled = false
+            elseif v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") then
+                v.Enabled = false
+            end
         end
-    end)
-    dragZone.InputEnded:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 or
-           inp.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(inp)
-        if not dragging then return end
-        if inp.UserInputType == Enum.UserInputType.MouseMovement or
-           inp.UserInputType == Enum.UserInputType.Touch then
-            local d = inp.Position - dragStart
-            win.Position = UDim2.new(
-                winStart.X.Scale, winStart.X.Offset + d.X,
-                winStart.Y.Scale, winStart.Y.Offset + d.Y
-            )
-        end
-    end)
-end
 
-btnMin.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    if minimized then
-        tween(win, 0.3, {Size = MINI})
-        task.delay(0.15, function()
-            navBg.Visible = false; content.Visible = false
-        end)
-        btnMin.Text = "+"
+        -- Limitar FPS target y reducir carga de render
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+
+        print("✅ Boost FPS activado — efectos visuales reducidos")
     else
-        navBg.Visible = true; content.Visible = true
-        tween(win, 0.3, {Size = FULL})
-        btnMin.Text = "−"
+        -- Restaurar configuraciones
+        local lighting = game:GetService("Lighting")
+        lighting.GlobalShadows = true
+
+        for _, fx in pairs(lighting:GetChildren()) do
+            if fx:IsA("BlurEffect") or fx:IsA("BloomEffect")
+            or fx:IsA("ColorCorrectionEffect") or fx:IsA("SunRaysEffect")
+            or fx:IsA("DepthOfFieldEffect") then
+                fx.Enabled = true
+            end
+        end
+
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") or v:IsA("Fire")
+            or v:IsA("Smoke") or v:IsA("Sparkles") then
+                v.Enabled = true
+            end
+        end
+
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+
+        print("🔄 Boost FPS desactivado — efectos restaurados")
     end
 end)
 
-btnClose.MouseButton1Click:Connect(function()
-    ESPEnabled = false; ClearESP()
-    local w = workspace:FindFirstChild("DivineWater"); if w then w:Destroy() end
-    spanel:Destroy(); SG:Destroy()
+-- ===== CONTROLES VENTANA =====
+closeBtn.MouseButton1Click:Connect(function()
+    ESPEnabled = false
+    ClearESP()
+    local w = workspace:FindFirstChild("DivineWaterSolid")
+    if w then w:Destroy() end
+    screenGui:Destroy()
+end)
+minimizeBtn.MouseButton1Click:Connect(function()
+    contentFrame.Visible = false
+    tabContainer.Visible = false
+    mainFrame:TweenSize(minimizedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.3, true)
+end)
+maximizeBtn.MouseButton1Click:Connect(function()
+    mainFrame:TweenSize(normalSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.3, true)
+    task.wait(0.2)
+    contentFrame.Visible = true
+    tabContainer.Visible = true
 end)
 
--- ══════════════════════════════════════════
--- INICIO — mostrar tab Combate
--- ══════════════════════════════════════════
-switchPage(pgCombat, tabCombat)
-
--- ══════════════════════════════════════════
--- SHIMMER animado en la línea del header
--- ══════════════════════════════════════════
-task.spawn(function()
-    local t = 0
-    while SG.Parent do
-        t = t + task.wait(0.045)
-        hlG.Offset = Vector2.new(math.sin(t) * 0.3, 0)
-    end
-end)
-
-print("✦ Divine Hub Gold Edition — OK")
+print("✅ Divine Hub Premium cargado correctamente")
