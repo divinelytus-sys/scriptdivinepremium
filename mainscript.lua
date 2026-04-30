@@ -410,7 +410,143 @@ espBtn.MouseButton1Click:Connect(function() ESPEnabled = not ESPEnabled espBtn.T
 
 -- ==================== OTRAS PÁGINAS (SIN MODIFICAR) ====================
 -- MOVIMIENTO
+-- ===== MOVIMIENTO =====
 local sBtn = addBtn("🚀 Speed Controller: OFF", Color3.fromRGB(0, 200, 200), movePage)
+
+local speedPanel = Instance.new("Frame", screenGui)
+speedPanel.Size = UDim2.new(0, 150, 0, 50)
+speedPanel.Position = UDim2.new(0, 20, 0.45, 0)
+speedPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+speedPanel.Visible = false
+speedPanel.Active = true
+speedPanel.Draggable = true
+speedPanel.BorderSizePixel = 0
+local speedCorner = Instance.new("UICorner", speedPanel)
+speedCorner.CornerRadius = UDim.new(0, 8)
+local speedStroke = Instance.new("UIStroke", speedPanel)
+speedStroke.Color = Color3.fromRGB(100, 200, 255)
+speedStroke.Thickness = 2
+
+local btnM = Instance.new("TextButton", speedPanel)
+btnM.Size = UDim2.new(0, 35, 0, 35)
+btnM.Position = UDim2.new(0.05, 0, 0.5, -17)
+btnM.Text = "−"
+btnM.BackgroundColor3 = Color3.fromRGB(50, 50, 100)
+btnM.TextColor3 = Color3.new(1, 1, 1)
+btnM.Font = Enum.Font.GothamBold
+btnM.TextSize = 18
+btnM.BorderSizePixel = 0
+local btnMCorner = Instance.new("UICorner", btnM)
+btnMCorner.CornerRadius = UDim.new(0, 6)
+
+local sDisp = Instance.new("TextLabel", speedPanel)
+sDisp.Size = UDim2.new(0, 50, 1, 0)
+sDisp.Position = UDim2.new(0.35, 0, 0, 0)
+sDisp.Text = "16"
+sDisp.TextColor3 = Color3.fromRGB(100, 200, 255)
+sDisp.Font = Enum.Font.GothamBold
+sDisp.TextSize = 16
+sDisp.BackgroundTransparency = 1
+
+local btnP = Instance.new("TextButton", speedPanel)
+btnP.Size = UDim2.new(0, 35, 0, 35)
+btnP.Position = UDim2.new(0.6, 0, 0.5, -17)
+btnP.Text = "+"
+btnP.BackgroundColor3 = Color3.fromRGB(50, 50, 100)
+btnP.TextColor3 = Color3.new(1, 1, 1)
+btnP.Font = Enum.Font.GothamBold
+btnP.TextSize = 18
+btnP.BorderSizePixel = 0
+local btnPCorner = Instance.new("UICorner", btnP)
+btnPCorner.CornerRadius = UDim.new(0, 6)
+
+local sVal, sAct = 16, false
+sBtn.MouseButton1Click:Connect(function()
+    sAct = not sAct
+    speedPanel.Visible = sAct
+    sBtn.Text = sAct and "🚀 Speed Controller: ON" or "🚀 Speed Controller: OFF"
+end)
+btnP.MouseButton1Click:Connect(function()
+    sVal = math.clamp(sVal + 10, 16, 500)
+    sDisp.Text = tostring(sVal)
+end)
+btnM.MouseButton1Click:Connect(function()
+    sVal = math.clamp(sVal - 10, 16, 500)
+    sDisp.Text = tostring(sVal)
+end)
+
+RunService.Heartbeat:Connect(function()
+    if sAct then
+        local char = Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+        if hum and hum.MoveDirection.Magnitude > 0 then
+            char:TranslateBy(hum.MoveDirection * (sVal / 55))
+        end
+    end
+end)
+
+local jBtn = addBtn("⬆️ Infinite Jump: OFF", Color3.fromRGB(100, 200, 255), movePage)
+local iJ = false
+jBtn.MouseButton1Click:Connect(function()
+    iJ = not iJ
+    jBtn.Text = iJ and "⬆️ Infinite Jump: ON" or "⬆️ Infinite Jump: OFF"
+end)
+UserInputService.JumpRequest:Connect(function()
+    if iJ then
+        local char = Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
+
+local nBtn = addBtn("🔥 No Clip: OFF", Color3.fromRGB(200, 100, 255), movePage)
+local ncl = false
+nBtn.MouseButton1Click:Connect(function()
+    ncl = not ncl
+    nBtn.Text = ncl and "🔥 No Clip: ON" or "🔥 No Clip: OFF"
+end)
+RunService.Stepped:Connect(function()
+    if ncl then
+        local char = Players.LocalPlayer.Character
+        if char then
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("BasePart") then v.CanCollide = false end
+            end
+        end
+    end
+end)
+
+local wowBtn = addBtn("💧 Walk on Water: OFF", Color3.fromRGB(0, 200, 255), movePage)
+local walkWaterEnabled = false
+wowBtn.MouseButton1Click:Connect(function()
+    walkWaterEnabled = not walkWaterEnabled
+    wowBtn.Text = walkWaterEnabled and "💧 Walk on Water: ON" or "💧 Walk on Water: OFF"
+end)
+RunService.RenderStepped:Connect(function()
+    local char = Players.LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if walkWaterEnabled and hrp then
+        if hrp.Position.Y >= 9.5 and hrp.AssemblyLinearVelocity.Y <= 0 then
+            local waterPart = workspace:FindFirstChild("DivineWaterSolid")
+            if not waterPart then
+                waterPart = Instance.new("Part", workspace)
+                waterPart.Name = "DivineWaterSolid"
+                waterPart.Size = Vector3.new(20, 1, 20)
+                waterPart.Transparency = 1
+                waterPart.Anchored = true
+                waterPart.CanCollide = true
+                waterPart.CanQuery = false
+            end
+            waterPart.CFrame = CFrame.new(hrp.Position.X, 9.2, hrp.Position.Z)
+        else
+            local w = workspace:FindFirstChild("DivineWaterSolid")
+            if w then w:Destroy() end
+        end
+    else
+        local w = workspace:FindFirstChild("DivineWaterSolid")
+        if w then w:Destroy() end
+    end
+end)
 -- ... [Resto de funciones de Movimiento, Sea2, Sea3, Visuals del script original] ...
 -- (He mantenido toda la lógica de Speed Controller, Infinite Jump, No Clip, etc.)
 
