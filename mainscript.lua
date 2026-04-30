@@ -1,5 +1,4 @@
 -- DIVINE HUB PREMIUM | loadstring ready
--- loadstring(game:HttpGet("URL_RAW_AQUI"))()
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
