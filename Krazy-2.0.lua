@@ -433,7 +433,7 @@ end
 
 -- [ VARIABLES DE CONTROL ]
 local KrazyAtack2Enabled = false
-local KrazyRange = 3000
+local KrazyRange = 8000
 local MaxTargetsPerFrame = 8 -- Límite para evitar kicks en cuentas flagged
 
 -- [ LISTA DE OBJETIVOS ESPECIALES ]
